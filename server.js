@@ -12,10 +12,11 @@ app.get("/scrape", async (req, res) => {
 			return res.status(400).json({ error: "URL parameter is required" });
 		}
 
-		// Launch Puppeteer
-		// Launch Puppeteer
+		// Launch Puppeteer with the path to the Chromium binary
 		const browser = await puppeteer.launch({
-			executablePath: "/usr/bin/chromium", // Path to the Chromium binary
+			executablePath:
+				process.env.PUPPETEER_EXECUTABLE_PATH ||
+				"/usr/bin/chromium-browser", // Path to the Chromium binary
 			args: ["--no-sandbox", "--disable-setuid-sandbox"],
 		});
 		const page = await browser.newPage();

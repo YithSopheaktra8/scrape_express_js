@@ -11,38 +11,22 @@ COPY package*.json ./
 RUN npm install
 
 # Install necessary dependencies for Puppeteer
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    libnss3 \
-    libxss1 \
-    libasound2 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libdbus-1-3 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libxshmfence1 \
+RUN apk update && apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    freetype-dev \
+    harfbuzz \
     ca-certificates \
-    fonts-liberation \
-    libappindicator3-1 \
-    libatk-bridge2.0-0 \
-    libxss1 \
-    lsb-release \
-    xdg-utils \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    ttf-freefont \
+    && apk add --no-cache --virtual .build-deps \
+    gcc \
+    g++ \
+    make \
+    python3
 
-# Install Chromium
-RUN apt-get update && apt-get install -y chromium
+# Tell Puppeteer to use the installed Chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Copy all source code to the working directory
 COPY . .
