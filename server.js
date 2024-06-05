@@ -1,5 +1,5 @@
 const express = require("express");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
 
 const app = express();
 const PORT = 3033;
@@ -13,7 +13,11 @@ app.get("/scrape", async (req, res) => {
 		}
 
 		// Launch Puppeteer
-		const browser = await puppeteer.launch();
+		// Launch Puppeteer
+		const browser = await puppeteer.launch({
+			executablePath: "/usr/bin/chromium-browser", // Path to the Chromium binary
+			args: ["--no-sandbox", "--disable-setuid-sandbox"],
+		});
 		const page = await browser.newPage();
 
 		// Navigate to the desired URL
