@@ -15,7 +15,7 @@ app.get("/scrape", async (req, res) => {
 		// Launch Puppeteer
 		// Launch Puppeteer
 		const browser = await puppeteer.launch({
-			executablePath: "/usr/bin/chromium-browser", // Path to the Chromium binary
+			executablePath: "/usr/bin/chromium", // Path to the Chromium binary
 			args: ["--no-sandbox", "--disable-setuid-sandbox"],
 		});
 		const page = await browser.newPage();
