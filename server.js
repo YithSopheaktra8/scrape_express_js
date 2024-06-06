@@ -19,7 +19,10 @@ app.get("/scrape", async (req, res) => {
 				"/usr/bin/chromium-browser", // Path to the Chromium binary
 			args: ["--no-sandbox", "--disable-setuid-sandbox"],
 		});
+		// const browser = await puppeteer.launch();
 		const page = await browser.newPage();
+		await page.setViewport({ width: 1280, height: 800 }); // Simulate a laptop or desktop screen
+
 
 		// Navigate to the desired URL
 		await page.goto(url, {
@@ -129,6 +132,7 @@ app.get("/scrape", async (req, res) => {
 					.json({ error: "metadata is not enough!" });
 			}
 		}
+
 		// Send the extracted data as a JSON response
 		res.json(result);
 	} catch (error) {
