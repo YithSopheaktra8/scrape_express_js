@@ -4,7 +4,6 @@ const puppeteer = require("puppeteer-core");
 const app = express();
 const PORT = 3033;
 
-
 app.get("/scrape", async (req, res) => {
 	try {
 		const { url } = req.query;
@@ -110,7 +109,7 @@ app.get("/scrape", async (req, res) => {
 
 			return {
 				title: document.title,
-				description: getMetaContent("description"),
+				description: getDescription(),
 				keywords:
 					getMetaContent("keywords") == null
 						? getMetaContent("description")
@@ -119,8 +118,8 @@ app.get("/scrape", async (req, res) => {
 					getMetaContent("og:title") == null
 						? document.title
 						: getMetaContent("og:title"),
-				ogDescription: getDescription(),
-				ogImage: ogImage == null ? relevantImages[0] : ogImage,
+				ogDescription: getMetaContent("description"),
+				thumbnail: ogImage == null ? relevantImages[0] : ogImage,
 				ogSiteName:
 					getMetaContent("og:site_name") == null
 						? document.title
@@ -129,12 +128,13 @@ app.get("/scrape", async (req, res) => {
 				images: relevantImages,
 			};
 		});
+		const fullUrl = new URL(url).origin; // Construct the full URL (with protocol and hostname)
 
 		// Close the browser
 		await browser.close();
 
 		// Send the extracted data as a JSON response
-		res.json(result);
+		res.json({ fullUrl, ...result });
 	} catch (error) {
 		console.error(error);
 		res.status(500).json({ error: "Something went wrong" });
