@@ -4,6 +4,7 @@ const puppeteer = require("puppeteer-core");
 const app = express();
 const PORT = 3033;
 
+
 app.get("/scrape", async (req, res) => {
 	try {
 		const { url } = req.query;
@@ -22,7 +23,6 @@ app.get("/scrape", async (req, res) => {
 		// const browser = await puppeteer.launch();
 		const page = await browser.newPage();
 		await page.setViewport({ width: 1280, height: 800 }); // Simulate a laptop or desktop screen
-
 
 		// Navigate to the desired URL
 		await page.goto(url, {
@@ -89,7 +89,12 @@ app.get("/scrape", async (req, res) => {
 						'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'
 					)
 				);
-				return links.map((link) => link.href);
+
+				// Extract hrefs of all icons
+				const iconHrefs = links.map((link) => link.href);
+
+				// Return the first icon href, or null if none found
+				return iconHrefs.length > 0 ? iconHrefs[0] : null;
 			};
 
 			const getDescription = () => {
@@ -110,7 +115,10 @@ app.get("/scrape", async (req, res) => {
 					getMetaContent("keywords") == null
 						? getMetaContent("description")
 						: getMetaContent("keywords"),
-				ogTitle: getMetaContent("og:title"),
+				ogTitle:
+					getMetaContent("og:title") == null
+						? document.title
+						: getMetaContent("og:title"),
 				ogDescription: getDescription(),
 				ogImage: ogImage == null ? relevantImages[0] : ogImage,
 				ogSiteName:
@@ -124,14 +132,6 @@ app.get("/scrape", async (req, res) => {
 
 		// Close the browser
 		await browser.close();
-
-		for (const key in result) {
-			if (result[key] === null) {
-				return res
-					.status(404)
-					.json({ error: "metadata is not enough!" });
-			}
-		}
 
 		// Send the extracted data as a JSON response
 		res.json(result);
