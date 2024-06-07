@@ -1,5 +1,5 @@
 const express = require("express");
-const puppeteer = require("puppeteer-core");
+const puppeteer = require("puppeteer");
 
 const app = express();
 const PORT = 3033;
@@ -13,13 +13,13 @@ app.get("/scrape", async (req, res) => {
 		}
 
 		// Launch Puppeteer with the path to the Chromium binary
-		const browser = await puppeteer.launch({
-			executablePath:
-				process.env.PUPPETEER_EXECUTABLE_PATH ||
-				"/usr/bin/chromium-browser", // Path to the Chromium binary
-			args: ["--no-sandbox", "--disable-setuid-sandbox"],
-		});
-		// const browser = await puppeteer.launch();
+		// const browser = await puppeteer.launch({
+		// 	executablePath:
+		// 		process.env.PUPPETEER_EXECUTABLE_PATH ||
+		// 		"/usr/bin/chromium-browser", // Path to the Chromium binary
+		// 	args: ["--no-sandbox", "--disable-setuid-sandbox"],
+		// });
+		const browser = await puppeteer.launch();
 		const page = await browser.newPage();
 		await page.setViewport({ width: 1280, height: 800 }); // Simulate a laptop or desktop screen
 
@@ -37,40 +37,35 @@ app.get("/scrape", async (req, res) => {
 				return element ? element.getAttribute("content") : null;
 			};
 
-			const getRelevantImages = async () => {
+			const getRelevantImages = () => {
 				const images = Array.from(document.querySelectorAll("img"));
+				const thresholdWidth = 600;
+				const thresholdHeight = 600;
 
-				// Sort images by area (width * height) in descending order
-				images.sort((a, b) => {
+				const highQualityImages = images
+					.filter(
+						(img) =>
+							img.naturalWidth >= thresholdWidth &&
+							img.naturalHeight >= thresholdHeight
+					)
+					.map((img) => decodeURIComponent(img.src))
+					.filter((src) => !src.toLowerCase().includes("icon"));
+
+				const sortedImages = images.sort((a, b) => {
 					return (
 						b.naturalWidth * b.naturalHeight -
 						a.naturalWidth * a.naturalHeight
 					);
 				});
 
-				const highQualityImages = [];
-				let highestResolutionImage = null;
+				const highestResolutionImage =
+					sortedImages.length > 0 ? sortedImages[0].src : null;
 
-				for (const img of images) {
-					if (img.naturalWidth > 600 && img.naturalHeight > 600) {
-						highQualityImages.push(img.src);
-					}
-
-					// Track the image with the highest resolution
-					if (
-						!highestResolutionImage ||
-						img.naturalWidth * img.naturalHeight >
-							highestResolutionImage.naturalWidth *
-								highestResolutionImage.naturalHeight
-					) {
-						highestResolutionImage = img;
-					}
-				}
-
-				// Return high-quality images if available, otherwise, return the image with the highest resolution
 				return highQualityImages.length > 0
 					? highQualityImages
-					: [highestResolutionImage.src];
+					: highestResolutionImage
+					? [highestResolutionImage]
+					: [];
 			};
 
 			// Get og:image if it exists
@@ -89,27 +84,73 @@ app.get("/scrape", async (req, res) => {
 					)
 				);
 
-				// Extract hrefs of all icons
 				const iconHrefs = links.map((link) => link.href);
 
-				// Return the first icon href, or null if none found
+				const logoLinks = Array.from(document.querySelectorAll("a"))
+					.filter((a) => a.href.toLowerCase().includes("logo"))
+					.map((a) => a.href);
+
+				if (logoLinks.length > 0) {
+					return logoLinks[0];
+				}
+
 				return iconHrefs.length > 0 ? iconHrefs[0] : null;
 			};
 
 			const getDescription = () => {
-				let description = getMetaContent("description");
+				const getMetaContent = (name) => {
+					const element =
+						document.querySelector(`meta[name="${name}"]`) ||
+						document.querySelector(`meta[property="${name}"]`);
+					return element ? element.getAttribute("content") : null;
+				};
+
+				let description =
+					getMetaContent("description") ||
+					getMetaContent("og:description");
+
 				if (!description) {
-					// If description is null, extract some content from the body of the page
-					description = document
-						.querySelector("body")
-						.textContent.slice(0, 150);
+					// If description is null, extract meaningful content from the page's body
+					const bodyText = document.body.textContent || "";
+					const paragraphs = Array.from(
+						document.querySelectorAll("p")
+					);
+
+					// Find the first non-empty paragraph with a reasonable length
+					const meaningfulParagraph = paragraphs.find(
+						(p) => p.textContent.trim().length > 150
+					);
+
+					// Use the text from the first meaningful paragraph or a slice of the body text
+					description = meaningfulParagraph
+						? meaningfulParagraph.textContent.trim()
+						: bodyText.slice(0, 150).trim();
 				}
+
 				return description;
+			};
+
+			const getExternalLinks = () => {
+				const links = Array.from(document.querySelectorAll("a"));
+				const externalLinks = links
+					.map((link) => link.href)
+					.filter((href) => {
+						try {
+							const url = new URL(href);
+							return url.origin !== document.location.origin;
+						} catch (e) {
+							return false;
+						}
+					});
+				return [...new Set(externalLinks)];
 			};
 
 			return {
 				title: document.title,
-				description: getDescription(),
+				description:
+					getDescription() == null || getDescription() == ""
+						? document.title
+						: getDescription(),
 				keywords:
 					getMetaContent("keywords") == null
 						? getMetaContent("description")
@@ -118,7 +159,6 @@ app.get("/scrape", async (req, res) => {
 					getMetaContent("og:title") == null
 						? document.title
 						: getMetaContent("og:title"),
-				ogDescription: getMetaContent("description"),
 				thumbnail: ogImage == null ? relevantImages[0] : ogImage,
 				ogSiteName:
 					getMetaContent("og:site_name") == null
@@ -126,15 +166,68 @@ app.get("/scrape", async (req, res) => {
 						: getMetaContent("og:site_name"),
 				icons: getIconLinks() == null ? ogImage : getIconLinks(),
 				images: relevantImages,
+				externalLinks: getExternalLinks(),
 			};
 		});
 		const fullUrl = new URL(url).origin; // Construct the full URL (with protocol and hostname)
+
+		const categorizeLinks = (links) => {
+			const categories = {
+				websites: [],
+				socialMedia: [],
+				emails: [],
+				phoneNumbers: [],
+			};
+
+			const socialMediaDomains = [
+				"facebook.com",
+				"linkedin.com",
+				"instagram.com",
+				"t.me",
+				"twitter.com",
+				"youtube.com",
+				"tiktok.com",
+			];
+
+			links.forEach((link) => {
+				const url = new URL(link);
+
+				if (link.startsWith("mailto:")) {
+					if (!link.includes("?")) {
+						categories.emails.push(link);
+					}
+				} else if (link.startsWith("tel:")) {
+					categories.phoneNumbers.push(link);
+				} else if (
+					socialMediaDomains.some((domain) =>
+						url.hostname.includes(domain)
+					)
+				) {
+					categories.socialMedia.push(link);
+				} else if (
+					link &&
+					link !== "javascript:void(0);" &&
+					!url.pathname.match(/\.(jpg|jpeg|png|gif)$/) &&
+					!url.hostname.includes("youtu.be")
+				) {
+					categories.websites.push(link);
+				}
+			});
+			return categories;
+		};
+
+		const categorizedLinks = categorizeLinks(result.externalLinks);
 
 		// Close the browser
 		await browser.close();
 
 		// Send the extracted data as a JSON response
-		res.json({ fullUrl, ...result });
+		res.json({
+			fullUrl,
+			...result,
+			externalLinks: undefined,
+			relatedLink: categorizedLinks,
+		});
 	} catch (error) {
 		console.error(error);
 		res.status(500).json({ error: "Something went wrong" });
