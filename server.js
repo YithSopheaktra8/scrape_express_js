@@ -1,5 +1,5 @@
 const express = require("express");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
 
 const app = express();
 const PORT = 3033;
@@ -13,13 +13,13 @@ app.get("/scrape", async (req, res) => {
 		}
 
 		// Launch Puppeteer with the path to the Chromium binary
-		// const browser = await puppeteer.launch({
-		// 	executablePath:
-		// 		process.env.PUPPETEER_EXECUTABLE_PATH ||
-		// 		"/usr/bin/chromium-browser", // Path to the Chromium binary
-		// 	args: ["--no-sandbox", "--disable-setuid-sandbox"],
-		// });
-		const browser = await puppeteer.launch();
+		const browser = await puppeteer.launch({
+			executablePath:
+				process.env.PUPPETEER_EXECUTABLE_PATH ||
+				"/usr/bin/chromium-browser", // Path to the Chromium binary
+			args: ["--no-sandbox", "--disable-setuid-sandbox"],
+		});
+		// const browser = await puppeteer.launch();
 		const page = await browser.newPage();
 		await page.setViewport({ width: 1280, height: 800 }); // Simulate a laptop or desktop screen
 
