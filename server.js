@@ -197,7 +197,9 @@ app.get("/scrape", async (req, res) => {
 						categories.emails.push(link);
 					}
 				} else if (link.startsWith("tel:")) {
-					categories.phoneNumbers.push(link);
+					// Decode URL-encoded phone numbers
+					const decodedPhone = decodeURIComponent(link.slice(4));
+					categories.phoneNumbers.push(decodedPhone);
 				} else if (
 					socialMediaDomains.some((domain) =>
 						url.hostname.includes(domain)
