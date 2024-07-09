@@ -26,6 +26,7 @@ app.get("/scrape", async (req, res) => {
 		// Navigate to the desired URL
 		await page.goto(url, {
 			waitUntil: "networkidle2",
+			timeout: 0, // Disable the timeout
 		});
 
 		// Extract data from the page
